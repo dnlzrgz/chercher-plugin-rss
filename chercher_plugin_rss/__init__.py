@@ -34,6 +34,7 @@ def parse_feed(client: httpx.Client, content: str) -> Generator[Document, None, 
             body, etag = fetch_content(client, uri)
             yield Document(
                 uri=uri,
+                title=entry.get("title", ""),
                 body=body,
                 hash=etag,
                 metadata={},
@@ -47,7 +48,10 @@ def ingest(uri: str, settings: dict) -> Generator[Document, None, None]:
     if not is_valid_url(uri):
         return
 
-    client = httpx.Client()
+    settings = settings.get("rss", {})
+    headers = settings.get("headers", {})
+
+    client = httpx.Client(headers=headers)
     try:
         content, _ = fetch_content(client, uri)
         yield from parse_feed(client, content)
