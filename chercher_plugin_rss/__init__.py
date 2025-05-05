@@ -1,8 +1,12 @@
 from typing import Generator
 from urllib.parse import urlparse
-import httpx
+from bs4 import BeautifulSoup
+from markdownify import MarkdownConverter
 import feedparser
+import httpx
 from chercher import Document, hookimpl
+
+markdown_converter = MarkdownConverter()
 
 
 def is_valid_url(url: str) -> bool:
@@ -31,16 +35,40 @@ def parse_feed(client: httpx.Client, content: str) -> Generator[Document, None, 
 
         assert isinstance(uri, str)
         try:
-            body, etag = fetch_content(client, uri)
+            resp_body, etag = fetch_content(client, uri)
+            soup = BeautifulSoup(resp_body, "lxml")
+            for tag in soup(
+                [
+                    "aside",
+                    "audio",
+                    "canvas",
+                    "embed",
+                    "footer",
+                    "form",
+                    "head",
+                    "iframe",
+                    "img",
+                    "nav",
+                    "noscript",
+                    "picture",
+                    "script",
+                    "style",
+                    "svg",
+                    "video",
+                ]
+            ):
+                tag.decompose()
+
+            content = markdown_converter.convert_soup(soup)
             yield Document(
                 uri=uri,
                 title=entry.get("title", ""),
-                body=body,
+                body=content,
                 hash=etag,
                 metadata={},
             )
-        except Exception:
-            continue
+        except Exception as e:
+            print("something went wrong", e)
 
 
 @hookimpl
